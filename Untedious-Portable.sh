@@ -36,10 +36,18 @@ FILE_NAME="$(basename "${THIS_FILE_ABSOLUTE_LOCATION}")"
 #           Versions           #
 # Type.Branch.YYYY.MM.STATUS.# #
 ################################
-TOOL_VERSION="Portable.PreAlpha.2022.09.S.2"
+TOOL_VERSION="Portable.PreAlpha.2022.10.S.1"
+#Seperator between rungs, get length for splitting as well
+$WIDTH_BAR="#########################################"
+
+file="Configurations/config_SaveAllVerbose.txt"
+newConfigName="CONFIG"
+
+
+
+
 
 VERSION_TYPE=${TOOL_VERSION/.*/}
-
 tempForBreakdown=${TOOL_VERSION/${VERSION_TYPE}./}
 VERSION_BRANCH=${tempForBreakdown/.*/}
 tempForBreakdown=${tempForBreakdown/${VERSION_BRANCH}./}
@@ -51,26 +59,26 @@ VERSION_STATUS=${tempForBreakdown/.*}
 tempForBreakdown=${tempForBreakdown/${VERSION_STATUS}./}
 VERSION_SUBNUMBER=${tempForBreakdown/.*}
 
-file="Configurations/config_SaveAllVerbose.txt"
 
-echo "##############################################"
-echo "Version Number: $TOOL_VERSION"
-echo "##############################################"
-echo "    Type: $VERSION_TYPE"
-echo "  Branch: $VERSION_BRANCH"
-echo "    Year: $VERSION_YEAR"
-echo "   Month: $VERSION_MONTH"
-tempForPrinting="  Status: ${_UNDERLINE}$VERSION_STATUS${_RESET}"
+print_version_info(){
+  echo "$WIDTH_BAR"
+  echo "Version: $TOOL_VERSION"
+  echo "$WIDTH_BAR"
+  echo "    Type: $VERSION_TYPE"
+  echo "  Branch: $VERSION_BRANCH"
+  echo "    Year: $VERSION_YEAR"
+  echo "   Month: ${VERSION_MONTH/*0/}"
+  tempForPrinting="  Status: ${_UNDERLINE}$VERSION_STATUS${_RESET}"
 
-if [ $VERSION_STATUS = "S" ]; then
-printf "${tempForPrinting}napshot\n"
-elif [ $VERSION_STATUS = "R" ]; then
-printf "${tempForPrinting}elease\n"
-fi
+  if [ $VERSION_STATUS = "S" ]; then
+  printf "${tempForPrinting}napshot\n"
+  elif [ $VERSION_STATUS = "R" ]; then
+  printf "${tempForPrinting}elease\n"
+  fi
 
-echo " SNumber: $VERSION_SUBNUMBER"
-echo "#######################"
-sleep 999
+  echo " SNumber: $VERSION_SUBNUMBER"
+  echo "$WIDTH_BAR"
+}
 
 print_head_board(){
   clear
@@ -109,7 +117,6 @@ get_input(){
 }
 
 
-
 indexOf(){
   local i=0
   while [ $i -lt $1 ]; do
@@ -119,52 +126,82 @@ indexOf(){
   done
 }
 
-
-
-
-print_head_board
-
-#Mode selector
-#NAME=$(whiptail --inputbox "What is your name?" 8 39 --title "Untedious Portable Version" 3>&1 1>&2 2>&3)
-#NAME=$(whiptail --inputbox "What is your name?" 8 39 --title "Untedious "${VERSION_TYPE}" Version" 3>&1 1>&2 2>&3)
+#DISPLAY INFO ABOUT PROGRAM
+print_head_board #File and user
 
 print_step_title "Config file writing to, parts ${_RED_}may be overridden${_GREEN_}. Will ask to keep or replace values." #TODO: Make make auto available as option in script
 
 
 
-#Get all packages not installed by the base in snapd
-#Command from https://askubuntu.com/questions/1261242/how-to-list-installed-packages-using-snap
-#snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr '\n' ' '
-#echo
-#snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr  ' ' '\n'
-
-#settingsLineNumber =
-
-
-#while read -r line; do
-#    echo -e "$line"
-#done <$file
 
 get_input_yn "Settings to ask above continue?"
 result=$?
 if [[  $result == 1 ]]; then
   while read -r line; do
       print_step_title "$line"
-#      echo ${$line*:}
-      echo {$line*:}
-      get_input_yn "PAUSE"
-      result=$?
+
+#      get_input_yn "PAUSE"
 
 #      print_step_title ""
 
-#      if [[ $? == "SAAP:" ]]; then
-#          echo "Going to save a list of snapds on this device"
-#          snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr  ' ' '\n'
-#          echo $?
-#          echo $?
-#          echo $?
-#          echo $?
-#      fi
+      result=${line/:*/}:
+      echo "=$result"
+      if [[ $result == "SASN:" ]]; then
+
+# https://stackoverflow.com/a/55930193
+          all="@"
+          active_db="@" #use the same value as $all to set all to active
+
+          #Get all packages not installed by the base in snap
+          #Command from https://askubuntu.com/questions/1261242/how-to-list-installed-packages-using-snap
+          dbs=($(snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr  ' ' ' ')) # using an array, not a string, means ${#dbs[@]} counts
+
+          # initialize an array with our explicit arguments
+          whiptail_args=(
+            --backtitle "backtitle"
+            --title "${VERSION_TYPE} Version ${VERSION_BRANCH}.${VERSION_YEAR}.${VERSION_MONTH}.${VERSION_SUBNUMBER}"
+            --checklist "Select which Snaps you want to save"
+            20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
+          )
+          i=0
+          for db in "${dbs[@]}"; do
+            whiptail_args+=( "$((++i))" "$db" )
+            if [[ "$active_db" == "$all" || $db = "$active_db" ]]; then    # only RHS needs quoting in [[ ]]
+              whiptail_args+=( "on" )
+            else
+              whiptail_args+=( "off" )
+            fi
+          done
+
+          # collect both stdout and exit status
+          # to grok the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
+          whiptail_out=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+
+          # display what we collected
+          declare -p whiptail_out whiptail_retval
+          echo ">>>""$whiptail_retval[@]"
+          whiptail_out=$(sed 's/\"//g' <<< "${whiptail_out}")
+          echo ">>"${whiptail_out}
+          whiptail_out_array=($whiptail_out)
+          echo "dbs array is this ${dbs[*]}"
+          echo "dbs array is this ${dbs[0]}"
+          echo "dbs array is this ${dbs[1]}"
+          echo "dbs array is this ${dbs[2]}"
+          echo "out_array is this ${whiptail_out_array[*]}"
+          whiptail_using_length=$((${#whiptail_out_array[@]}))
+          echo "Number of Snaps is "$(($whiptail_using_length))
+          echo "Saving Snap(s): "
+          for ((i = 0; i < ${#whiptail_out_array[@]}; i++))
+          do
+              use_this=${dbs[$(( ${whiptail_out_array[$i]} - 1 ))]}
+              echo $use_this
+              sed -i '/SASN:/a '$use_this Configurations/config_SaveAllVerbose.txt
+          done
+
+#        echo "Going to save a list of snaps on this device '{print $1}' | tr  ' ' '\n'
+        echo $?
+      fi
+
 #      if get_input_keepOrOverride "Version: "
 
   done <$file
@@ -173,16 +210,12 @@ else
   echo "FALSE!!!!"
 fi
 
+
+
+echo ""
+echo "BEFORE SLEEP 999"
+sleep 999
 #indexOf "01234" "123"
-
-echo $?
-
-export FOO="CFIL: Created From Location:"
-#"Name   Age  ID         Address"
-#BEGIN=${FOO/Age*/}
-BEGIN = ${FOO/:*/}
-echo $BEGIN
-
 
 files="$(ls -A .)"
 select filename in ${files}; do echo "You selected ${filename}"; break; done

@@ -1,12 +1,10 @@
-VERS: Version:
-CFUS: Created From User:
+VERS:
+
+SASN: Snap addded
+SRSN: Snap removed
+SRAP: apt-get remove
+SAAP: apt-get install
+
+FUS: Created From User:
 CFIL: Created From Location:
 NOTE: Notes:
-Snapd removed:
-Snapd saved:
-apt removed:
-apt saved:
-
-apt flag for purge and autoremove
-
-SAAP: apt-get install

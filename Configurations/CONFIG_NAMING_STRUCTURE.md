@@ -6,9 +6,9 @@ VERS = Version of untedious tool
 VE__ = 
 
 ## S (<u>S</u>oftware) List (<u>A</u>dded/<u>R</u>emoved) ##
-# <u>Sn</u>apd # 
-SASN: Snapd addded
-SRSN: Snapd removed
+# <u>Sn</u>ap # 
+SASN: Snap addded
+SRSN: Snap removed
 
 # <u>A_</u>___ (apt) #
 
@@ -19,4 +19,9 @@ SAAP: apt-get install
 FUS: Created From User:
 CFIL: Created From Location:
 NOTE: Notes:
-S
+
+## To still sort out
+CFUS: Created From User:
+CFIL: Created From Location:
+NOTE: Notes:
+apt flag for purge and autoremove
