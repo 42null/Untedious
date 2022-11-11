@@ -36,13 +36,14 @@ FILE_NAME="$(basename "${THIS_FILE_ABSOLUTE_LOCATION}")"
 #           Versions           #
 # Type.Branch.YYYY.MM.STATUS.# #
 ################################
-TOOL_VERSION="Portable.PreAlpha.2022.10.S.1"
+TOOL_VERSION="Portable.PreAlpha.2022.11.S.1"
 #Seperator between rungs, get length for splitting as well
 $WIDTH_BAR="#########################################"
 
-file="Configurations/config_SaveAllVerbose.txt"
-newConfigName="CONFIG"
-
+file="Configurations/config_masterTemplate.txt"
+currentConfigFile="$file"
+currentConfigFileName=${currentConfigFile##*/}
+currentConfigFileName=${currentConfigFileName%%.*}
 
 
 
@@ -139,7 +140,7 @@ if [[ $userApprovedConfig == 1 ]]; then
   #dbs=("CREATE new Configuration" "Manual" "CREATE new Configuration" "Auto" "EDIT Configuration" "" "VIEW Configuration" "" "APPLY Configuration" "" "SELECT a different configuration" "" "BACKUP Configuration" "" "REMOVE Configuration" "")
   whiptail_args=(
     --title " ---~<{: Menu :}>~--- "
-    --radiolist "What would you like to do with the current configuration"
+    --radiolist "What would you like to do with the current configuration ("${currentConfigFile}")"
     20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
   )
   i=0
@@ -173,16 +174,27 @@ if [[ $userApprovedConfig == 1 ]]; then
     echo "You choose option #"${_UNDERLINE}${chosenOption}${_RESET}
     echo "You choose to "$chosenOption
   fi
-  result=1
+  readLineFromFile=1
 
-  if [[  $chosenOption == 1 ]]; then # CREATE A NEW CONFIG
-    if [[  $result == 1 ]]; then # Loop through save options
-      while read -r line; do
-        print_step_title "$line"
+  echo "$currentConfigFileName"
+  if [[  $chosenOption == 1 ]]; then # CREATE NEW CONFIG
+    currentConfigFile=$(whiptail --inputbox "What should this new config file be called?"\
+                         8 39  $currentConfigFileName --title "New Config File Name" 3>&1 1>&2 2>&3)
+    exitstatus=$?
 
-        result=${line/:*/}:
-        echo "=$result"
-        if [[ $result == "SASN:" ]]; then
+    currentConfigFile=""$currentConfigFile".txt"
+    cp "Configurations/config_masterTemplate.txt" "Configurations/"$currentConfigFile
+
+
+    if [ $exitstatus = 0 ]; then
+      echo "User selected Ok and entered "$currentConfigFile
+      if [[ $readLineFromFile == 1 ]]; then # Loop through save options
+        while read -r line; do
+          print_step_title "$line"
+
+          readLineFromFile=${line/:*/}:
+          echo "=$readLineFromFile"
+          if [[ $readLineFromFile == "SASN:" ]]; then
 
             # https://stackoverflow.com/a/55930193
             all="@"
@@ -226,14 +238,48 @@ if [[ $userApprovedConfig == 1 ]]; then
             do
                 use_this=${dbs[$(( ${whiptail_out_array[$i]} - 1 ))]}
                 echo $use_this
-                sed -i '/SASN:/a '$use_this Configurations/config_SaveAllVerbose.txt
+                sed -i '/SASN:/a '$use_this Configurations/$currentConfigFile
             done
 
-          echo $?
+            echo $?
+          fi
+        done <$file
+      fi
+    else
+        echo "User selected Cancel."
+    fi
+
+    echo "(Exit status was $exitstatus)"
+    if [[ $exitstatus == 1 ]]; then
+      break 1
+    fi
+
+
+
+  elif [[ $chosenOption == 5 ]]; then # APPLY THE CONFIGURATION
+    nextIs=0;
+    was=0;
+    while read -r line; do
+#        print_step_title "$line"
+
+        readLineFromFile=${line/:*/}:
+        echo "=$readLineFromFile"
+
+
+        #If the line contains a ":"
+        if grep -q ":" <<< "$readLineFromFile"; then
+          echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+          nextIs="0"
+        fi
+
+
+        if [[ nextIs == "1" ]]; then
+          echo "$readLineFromFile TEST~~~~~~~~~~~"
+        elif [[ "$readLineFromFile" == "SASN:" ]]; then
+          nextIs="1"config_SaveAllVerbose
         fi
       done <$file
-    fi
-  else
+  else #Selection options from main menu
     echo "Ok, exiting the program."
   fi
 else
