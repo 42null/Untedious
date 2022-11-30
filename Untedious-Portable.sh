@@ -61,6 +61,9 @@ tempForBreakdown=${tempForBreakdown/${VERSION_STATUS}./}
 VERSION_SUBNUMBER=${tempForBreakdown/.*}
 
 
+default_menu_option = 4;
+
+
 print_version_info(){
   echo "$WIDTH_BAR"
   echo "Version: $TOOL_VERSION"
@@ -136,7 +139,7 @@ get_input_yn "Settings to ask above continue?"
 userApprovedConfig=$?
 if [[ $userApprovedConfig == 1 ]]; then
 
-  dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration")
+  dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration" "Set Default Menu Option")
   #dbs=("CREATE new Configuration" "Manual" "CREATE new Configuration" "Auto" "EDIT Configuration" "" "VIEW Configuration" "" "APPLY Configuration" "" "SELECT a different configuration" "" "BACKUP Configuration" "" "REMOVE Configuration" "")
   whiptail_args=(
     --title " ---~<{: Menu :}>~--- "
@@ -157,7 +160,7 @@ if [[ $userApprovedConfig == 1 ]]; then
 
   for db in "${dbs[@]}"; do
     whiptail_args+=( "$((++i))" "$db" )
-    if [[ "$((i))" == "1"  ]]; then
+    if [[ "$((i))" == "$default_menu_option"  ]]; then
       whiptail_args+=( "on" )
     else
       whiptail_args+=( "off" )
@@ -214,7 +217,7 @@ if [[ $userApprovedConfig == 1 ]]; then
             i=0
             for db in "${dbs[@]}"; do
               whiptail_args+=( "$((++i))" "$db" )
-              if [[ "$active_db" == "$all" || $db = "$active_db" ]]; then  # only RHS needs quoting in [[ ]]
+              if [[ "$active_db" == "$all" || $db = "$active_db" ]]; then
                 whiptail_args+=( "on" )
               else
                 whiptail_args+=( "off" )
@@ -279,6 +282,28 @@ if [[ $userApprovedConfig == 1 ]]; then
           nextIs="1"config_SaveAllVerbose
         fi
       done <$file
+  elif [[ $chosenOption == 6 ]]; then # APPLY THE CONFIGURATION
+#    i=0
+#    s=65    # decimal ASCII "A"
+#    do
+#        files[i]="$f"
+##        files[i]="$f"    # save file name
+##        ((i+=2))
+##        ((s++))
+#    done
+#    whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
+#        --menu "Please select the file to restore" 14 40 6 "${files[@]}"
+# https://stackoverflow.com/a/1564725
+    for f in Configurations/*.txt
+    do
+        # convert to octal then ASCII character for selection tag
+#        --files[i]=$(echo -en "\0$(( $s / 64 * 100 + $s % 64 / 8 * 10 + $s % 8 ))")
+        files[i]="$f"    # save file name
+    done
+    whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
+        --menu "Please select the file to restore" 14 40 6 "${files[@]}"
+
+
   else #Selection options from main menu
     echo "Ok, exiting the program."
   fi
