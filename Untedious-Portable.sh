@@ -61,7 +61,7 @@ tempForBreakdown=${tempForBreakdown/${VERSION_STATUS}./}
 VERSION_SUBNUMBER=${tempForBreakdown/.*}
 
 
-default_menu_option = 4;
+default_menu_option=6;
 
 
 print_version_info(){
@@ -157,158 +157,152 @@ if [[ $userApprovedConfig == 1 ]]; then
 #          fi
 #          i+=1
 #        done
+echo $"default_menu_option =" $default_menu_option
+  while [ "$exitStatus" !=  0 ]
+  do
+    for db in "${dbs[@]}"; do
+      whiptail_args+=( "$((++i))" "$db" )
+      if [[ "$((i))" == "$default_menu_option"  ]]; then
+        whiptail_args+=( "on" )
+      else
+        whiptail_args+=( "off" )
+      fi
+    done
 
-  for db in "${dbs[@]}"; do
-    whiptail_args+=( "$((++i))" "$db" )
-    if [[ "$((i))" == "$default_menu_option"  ]]; then
-      whiptail_args+=( "on" )
-    else
-      whiptail_args+=( "off" )
+    # collect both stdout and exit status
+    # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
+    chosenOption=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+
+    exitStatus=$?
+
+    if [ $exitStatus = 0 ]; then
+      echo "You choose option #"${_UNDERLINE}${chosenOption}${_RESET}
+      echo "You choose to "$chosenOption
     fi
-  done
+    readLineFromFile=1
 
-  # collect both stdout and exit status
-  # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
-  chosenOption=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+    echo "$currentConfigFileName"
+    if [[  $chosenOption == 1 ]]; then # CREATE NEW CONFIG
+      currentConfigFile=$(whiptail --inputbox "What should this new config file be called?"\
+                           8 39  $currentConfigFileName --title "New Config File Name" 3>&1 1>&2 2>&3)
+      exitstatus=$?
 
-  exitStatus=$?
-
-  if [ $exitStatus = 0 ]; then
-    echo "You choose option #"${_UNDERLINE}${chosenOption}${_RESET}
-    echo "You choose to "$chosenOption
-  fi
-  readLineFromFile=1
-
-  echo "$currentConfigFileName"
-  if [[  $chosenOption == 1 ]]; then # CREATE NEW CONFIG
-    currentConfigFile=$(whiptail --inputbox "What should this new config file be called?"\
-                         8 39  $currentConfigFileName --title "New Config File Name" 3>&1 1>&2 2>&3)
-    exitstatus=$?
-
-    currentConfigFile=""$currentConfigFile".txt"
-    cp "Configurations/config_masterTemplate.txt" "Configurations/"$currentConfigFile
+      currentConfigFile=""$currentConfigFile".txt"
+      cp "Configurations/config_masterTemplate.txt" "Configurations/"$currentConfigFile
 
 
-    if [ $exitstatus = 0 ]; then
-      echo "User selected Ok and entered "$currentConfigFile
-      if [[ $readLineFromFile == 1 ]]; then # Loop through save options
-        while read -r line; do
-          print_step_title "$line"
+      if [ $exitstatus = 0 ]; then
+        echo "User selected Ok and entered "$currentConfigFile
+        if [[ $readLineFromFile == 1 ]]; then # Loop through save options
+          while read -r line; do
+            print_step_title "$line"
+
+            readLineFromFile=${line/:*/}:
+            echo "=$readLineFromFile"
+            if [[ $readLineFromFile == "SASN:" ]]; then
+
+              # https://stackoverflow.com/a/55930193
+              all="@"
+              active_db="@" #use the same value as $all to set all to active
+
+              #Get all packages not installed by the base in snap
+              #Command from https://askubuntu.com/questions/1261242/how-to-list-installed-packages-using-snap
+              dbs=($(snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr  ' ' ' ')) # using an array, not a string, means ${#dbs[@]} counts
+
+              # initialize an array with our explicit arguments
+              whiptail_args=(
+                --backtitle "backtitle"
+                --title "${VERSION_TYPE} Version ${VERSION_BRANCH}.${VERSION_YEAR}.${VERSION_MONTH}.${VERSION_SUBNUMBER}"
+                --checklist "Select which Snaps you want to save"
+                20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
+              )
+              i=0
+              for db in "${dbs[@]}"; do
+                whiptail_args+=( "$((++i))" "$db" )
+                if [[ "$active_db" == "$all" || $db = "$active_db" ]]; then
+                  whiptail_args+=( "on" )
+                else
+                  whiptail_args+=( "off" )
+                fi
+              done
+
+              # collect both stdout and exit status
+              # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
+              whiptail_out=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+
+              # display what we collected
+              declare -p whiptail_out whiptail_retval
+              echo ">>>""$whiptail_retval[@]"
+              whiptail_out=$(sed 's/\"//g' <<< "${whiptail_out}")
+              echo ">>"${whiptail_out}
+              whiptail_out_array=($whiptail_out)
+              whiptail_using_length=$((${#whiptail_out_array[@]}))
+              echo "Number of Snaps is "$(($whiptail_using_length))
+              echo "Saving Snap(s): "
+              for ((i = 0; i < ${#whiptail_out_array[@]}; i++))
+              do
+                  use_this=${dbs[$(( ${whiptail_out_array[$i]} - 1 ))]}
+                  echo $use_this
+                  sed -i '/SASN:/a '$use_this Configurations/$currentConfigFile
+              done
+
+              echo $?
+            fi
+          done <$file
+        fi
+      else
+        echo "User selected Cancel."
+      fi
+
+      echo "(Exit status was $exitstatus)"
+      if [[ $exitstatus == 1 ]]; then
+        break 1
+      fi
+
+
+
+    elif [[ $chosenOption == 5 ]]; then # APPLY THE CONFIGURATION
+      nextIs=0;
+      was=0;
+      while read -r line; do
+  #        print_step_title "$line"
 
           readLineFromFile=${line/:*/}:
           echo "=$readLineFromFile"
-          if [[ $readLineFromFile == "SASN:" ]]; then
 
-            # https://stackoverflow.com/a/55930193
-            all="@"
-            active_db="@" #use the same value as $all to set all to active
 
-            #Get all packages not installed by the base in snap
-            #Command from https://askubuntu.com/questions/1261242/how-to-list-installed-packages-using-snap
-            dbs=($(snap list | grep -v Publisher | grep -v canonical | awk '{print $1}' | tr  ' ' ' ')) # using an array, not a string, means ${#dbs[@]} counts
+          #If the line contains a ":"
+          if grep -q ":" <<< "$readLineFromFile"; then
+            echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            nextIs="0"
+          fi
 
-            # initialize an array with our explicit arguments
-            whiptail_args=(
-              --backtitle "backtitle"
-              --title "${VERSION_TYPE} Version ${VERSION_BRANCH}.${VERSION_YEAR}.${VERSION_MONTH}.${VERSION_SUBNUMBER}"
-              --checklist "Select which Snaps you want to save"
-              20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
-            )
-            i=0
-            for db in "${dbs[@]}"; do
-              whiptail_args+=( "$((++i))" "$db" )
-              if [[ "$active_db" == "$all" || $db = "$active_db" ]]; then
-                whiptail_args+=( "on" )
-              else
-                whiptail_args+=( "off" )
-              fi
-            done
 
-            # collect both stdout and exit status
-            # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
-            whiptail_out=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
-
-            # display what we collected
-            declare -p whiptail_out whiptail_retval
-            echo ">>>""$whiptail_retval[@]"
-            whiptail_out=$(sed 's/\"//g' <<< "${whiptail_out}")
-            echo ">>"${whiptail_out}
-            whiptail_out_array=($whiptail_out)
-            whiptail_using_length=$((${#whiptail_out_array[@]}))
-            echo "Number of Snaps is "$(($whiptail_using_length))
-            echo "Saving Snap(s): "
-            for ((i = 0; i < ${#whiptail_out_array[@]}; i++))
-            do
-                use_this=${dbs[$(( ${whiptail_out_array[$i]} - 1 ))]}
-                echo $use_this
-                sed -i '/SASN:/a '$use_this Configurations/$currentConfigFile
-            done
-
-            echo $?
+          if [[ nextIs == "1" ]]; then
+            echo "$readLineFromFile TEST~~~~~~~~~~~"
+          elif [[ "$readLineFromFile" == "SASN:" ]]; then
+            nextIs="1"config_SaveAllVerbose
           fi
         done <$file
-      fi
-    else
-        echo "User selected Cancel."
+    elif [[ $chosenOption == 6 ]]; then # APPLY THE CONFIGURATION
+      i=0
+      for f in Configurations/*.txt
+      do
+          # convert to octal then ASCII character for selection tag
+          files[i]="" #TODO FIX AGAIN
+          files[i+1]="$f"
+          ((i+=2))
+      done
+
+      whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
+          --menu "Please select the file to restore" 14 40 6 "${files[@]}"
+
+    else #Selection options from main menu
+      echo "Ok, exiting the program."
     fi
-
-    echo "(Exit status was $exitstatus)"
-    if [[ $exitstatus == 1 ]]; then
-      break 1
-    fi
-
-
-
-  elif [[ $chosenOption == 5 ]]; then # APPLY THE CONFIGURATION
-    nextIs=0;
-    was=0;
-    while read -r line; do
-#        print_step_title "$line"
-
-        readLineFromFile=${line/:*/}:
-        echo "=$readLineFromFile"
-
-
-        #If the line contains a ":"
-        if grep -q ":" <<< "$readLineFromFile"; then
-          echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-          nextIs="0"
-        fi
-
-
-        if [[ nextIs == "1" ]]; then
-          echo "$readLineFromFile TEST~~~~~~~~~~~"
-        elif [[ "$readLineFromFile" == "SASN:" ]]; then
-          nextIs="1"config_SaveAllVerbose
-        fi
-      done <$file
-  elif [[ $chosenOption == 6 ]]; then # APPLY THE CONFIGURATION
-#    i=0
-#    s=65    # decimal ASCII "A"
-#    do
-#        files[i]="$f"
-##        files[i]="$f"    # save file name
-##        ((i+=2))
-##        ((s++))
-#    done
-#    whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
-#        --menu "Please select the file to restore" 14 40 6 "${files[@]}"
-# https://stackoverflow.com/a/1564725
-    for f in Configurations/*.txt
-    do
-        # convert to octal then ASCII character for selection tag
-#        --files[i]=$(echo -en "\0$(( $s / 64 * 100 + $s % 64 / 8 * 10 + $s % 8 ))")
-        files[i]="$f"    # save file name
-    done
-    whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
-        --menu "Please select the file to restore" 14 40 6 "${files[@]}"
-
-
-  else #Selection options from main menu
-    echo "Ok, exiting the program."
-  fi
+  done
 else
-  echo "Ok, existing the program. No files have been modified"
+  echo "Ok, existing the program. No files have been modified"#TODO: CHECK LOCATION
 fi
 #
 #echo ""
