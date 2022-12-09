@@ -36,7 +36,7 @@ FILE_NAME="$(basename "${THIS_FILE_ABSOLUTE_LOCATION}")"
 #           Versions           #
 # Type.Branch.YYYY.MM.STATUS.# #
 ################################
-TOOL_VERSION="Portable.PreAlpha.2022.11.S.1"
+TOOL_VERSION="Portable.PreAlpha.2022.12.S.2"
 #Seperator between rungs, get length for splitting as well
 $WIDTH_BAR="#########################################"
 
@@ -46,6 +46,7 @@ currentConfigFileName=${currentConfigFile##*/}
 currentConfigFileName=${currentConfigFileName%%.*}
 
 
+PRIMARY_FOLDER=${THIS_FILE_ABSOLUTE_LOCATION/${FILE_NAME}*/}
 
 
 VERSION_TYPE=${TOOL_VERSION/.*/}
@@ -138,28 +139,19 @@ print_step_title "Config file writing to, parts ${_RED_}may be overridden${_GREE
 get_input_yn "Settings to ask above continue?"
 userApprovedConfig=$?
 if [[ $userApprovedConfig == 1 ]]; then
-
-  dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration" "Set Default Menu Option")
-  #dbs=("CREATE new Configuration" "Manual" "CREATE new Configuration" "Auto" "EDIT Configuration" "" "VIEW Configuration" "" "APPLY Configuration" "" "SELECT a different configuration" "" "BACKUP Configuration" "" "REMOVE Configuration" "")
-  whiptail_args=(
-    --title " ---~<{: Menu :}>~--- "
-    --radiolist "What would you like to do with the current configuration ("${currentConfigFile}")"
-    20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
-  )
-  i=0
-#        for db in "${dbs[@]}"; do
-#          if [ $i -eq 0 ]; then
-#            whiptail_args+=( "$i" "$db" )
-#          fi
-#          if [ $i -eq 1 ]; then
-#            whiptail_args+=( "$db" )
-#            whiptail_args+=( "on" )
-#          fi
-#          i+=1
-#        done
-echo $"default_menu_option =" $default_menu_option
-  while [ "$exitStatus" !=  0 ]
+  echo $"default_menu_option =" $default_menu_option
+  exitStatus=0
+  while [ "$exitStatus" = 0 ]
   do
+    dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration" "Set Default Menu Option" "TEMPORARY FIX [EXIT BUTTON]")
+    #dbs=("CREATE new Configuration" "Manual" "CREATE new Configuration" "Auto" "EDIT Configuration" "" "VIEW Configuration" "" "APPLY Configuration" "" "SELECT a different configuration" "" "BACKUP Configuration" "" "REMOVE Configuration" "")
+    whiptail_args=(
+      --title " ---~<{: Menu :}>~--- "
+      --radiolist "What would you like to do with the current configuration ("${currentConfigFile}")"
+      20 80 "${#dbs[@]}"  # note the use of ${#arrayname[@]} to get count of entries
+    )
+    i=0
+
     for db in "${dbs[@]}"; do
       whiptail_args+=( "$((++i))" "$db" )
       if [[ "$((i))" == "$default_menu_option"  ]]; then
@@ -179,19 +171,25 @@ echo $"default_menu_option =" $default_menu_option
       echo "You choose option #"${_UNDERLINE}${chosenOption}${_RESET}
       echo "You choose to "$chosenOption
     fi
+
+
+    if [ $chosenOption = 10 ]; then
+      break;
+    fi
+
     readLineFromFile=1
 
     echo "$currentConfigFileName"
     if [[  $chosenOption == 1 ]]; then # CREATE NEW CONFIG
       currentConfigFile=$(whiptail --inputbox "What should this new config file be called?"\
                            8 39  $currentConfigFileName --title "New Config File Name" 3>&1 1>&2 2>&3)
-      exitstatus=$?
+      exitStatus=$?
 
-      currentConfigFile=""$currentConfigFile".txt"
-      cp "Configurations/config_masterTemplate.txt" "Configurations/"$currentConfigFile
+      currentConfigFile=$currentConfigFile".txt"
+      cp $PRIMARY_FOLDER"Configurations/config_masterTemplate.txt" $PRIMARY_FOLDER"Configurations/"$currentConfigFile
 
 
-      if [ $exitstatus = 0 ]; then
+      if [ $exitStatus = 0 ]; then
         echo "User selected Ok and entered "$currentConfigFile
         if [[ $readLineFromFile == 1 ]]; then # Loop through save options
           while read -r line; do
@@ -252,10 +250,11 @@ echo $"default_menu_option =" $default_menu_option
         fi
       else
         echo "User selected Cancel."
+        break 1
       fi
 
-      echo "(Exit status was $exitstatus)"
-      if [[ $exitstatus == 1 ]]; then
+      echo "(Exit status was $exitStatus)"
+      if [[ $exitStatus == 1 ]]; then
         break 1
       fi
 
@@ -267,39 +266,44 @@ echo $"default_menu_option =" $default_menu_option
       while read -r line; do
   #        print_step_title "$line"
 
-          readLineFromFile=${line/:*/}:
-          echo "=$readLineFromFile"
+        readLineFromFile=${line/:*/}:
+        echo "=$readLineFromFile"
 
 
-          #If the line contains a ":"
-          if grep -q ":" <<< "$readLineFromFile"; then
-            echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            nextIs="0"
-          fi
+        #If the line contains a ":"
+        if grep -q ":" <<< "$readLineFromFile"; then
+          echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+          nextIs="0"
+        fi
 
 
-          if [[ nextIs == "1" ]]; then
-            echo "$readLineFromFile TEST~~~~~~~~~~~"
-          elif [[ "$readLineFromFile" == "SASN:" ]]; then
-            nextIs="1"config_SaveAllVerbose
-          fi
-        done <$file
-    elif [[ $chosenOption == 6 ]]; then # APPLY THE CONFIGURATION
+        if [[ nextIs == "1" ]]; then
+          echo "$readLineFromFile TEST~~~~~~~~~~~"
+        elif [[ "$readLineFromFile" == "SASN:" ]]; then
+          nextIs="1"config_SaveAllVerbose
+        fi
+      done <$file
+      $exitStatus=-2;
+      echo $exitStatus
+    elif [[ $chosenOption == 6 ]]; then # SELECT THE CONFIGURATION
       i=0
-      for f in Configurations/*.txt
+      for f in "$PRIMARY_FOLDER"Configurations/*.txt
+#      .txt
       do
-          # convert to octal then ASCII character for selection tag
           files[i]="" #TODO FIX AGAIN
           files[i+1]="$f"
           ((i+=2))
       done
 
-      whiptail --backtitle "Welcome to SEUL" --title "Restore Files" \
-          --menu "Please select the file to restore" 14 40 6 "${files[@]}"
+      currentConfigFile=$(whiptail --backtitle "Backtitle" --title "Select a configuration" \
+        --menu "Showing all .txt's, (non-config files may appear)" 20 80 6 "${files[@]}" 3>&1 1>&2 2>&3)
+
+      exitStatus=$?
 
     else #Selection options from main menu
       echo "Ok, exiting the program."
     fi
+    echo "exitStatus="$exitStatus
   done
 else
   echo "Ok, existing the program. No files have been modified"#TODO: CHECK LOCATION
