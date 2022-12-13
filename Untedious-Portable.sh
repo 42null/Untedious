@@ -143,7 +143,7 @@ if [[ $userApprovedConfig == 1 ]]; then
   exitStatus=0
   while [ "$exitStatus" = 0 ]
   do
-    dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration" "Set Default Menu Option" "TEMPORARY FIX [EXIT BUTTON]")
+    dbs=("CREATE new Configuration" "CREATE new Configuration" "EDIT Configuration" "VIEW Configuration" "APPLY Configuration" "SELECT a different configuration" "BACKUP Configuration" "REMOVE Configuration")
     #dbs=("CREATE new Configuration" "Manual" "CREATE new Configuration" "Auto" "EDIT Configuration" "" "VIEW Configuration" "" "APPLY Configuration" "" "SELECT a different configuration" "" "BACKUP Configuration" "" "REMOVE Configuration" "")
     whiptail_args=(
       --title " ---~<{: Menu :}>~--- "
@@ -163,19 +163,18 @@ if [[ $userApprovedConfig == 1 ]]; then
 
     # collect both stdout and exit status
     # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
-    chosenOption=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+    chosenOption=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3);
 
     exitStatus=$?
 
-    if [ $exitStatus = 0 ]; then
+
+    if [[ $exitStatus == 0 ]]; then
       echo "You choose option #"${_UNDERLINE}${chosenOption}${_RESET}
       echo "You choose to "$chosenOption
+    else
+      break 1;
     fi
 
-
-    if [ $chosenOption = 10 ]; then
-      break;
-    fi
 
     readLineFromFile=1
 
@@ -227,6 +226,7 @@ if [[ $userApprovedConfig == 1 ]]; then
               # collect both stdout and exit status
               # to change the file descriptor switch, see https://stackoverflow.com/a/1970254/14122
               whiptail_out=$(whiptail "${whiptail_args[@]}" 3>&1 1>&2 2>&3); whiptail_retval=$?
+              exitStatus=$?
 
               # display what we collected
               declare -p whiptail_out whiptail_retval
@@ -253,10 +253,10 @@ if [[ $userApprovedConfig == 1 ]]; then
         break 1
       fi
 
-      echo "(Exit status was $exitStatus)"
-      if [[ $exitStatus == 1 ]]; then
-        break 1
-      fi
+#      echo "(Exit status was $exitStatus)"
+#      if [[ $exitStatus == 1 ]]; then
+#        break 1
+#      fi
 
 
 
@@ -288,14 +288,13 @@ if [[ $userApprovedConfig == 1 ]]; then
     elif [[ $chosenOption == 6 ]]; then # SELECT THE CONFIGURATION
       i=0
       for f in "$PRIMARY_FOLDER"Configurations/*.txt
-#      .txt
       do
           files[i]="" #TODO FIX AGAIN
           files[i+1]="$f"
           ((i+=2))
       done
 
-      currentConfigFile=$(whiptail --backtitle "Backtitle" --title "Select a configuration" \
+      $currentConfigFile=$(whiptail --backtitle "Backtitle" --title "Select a configuration" \
         --menu "Showing all .txt's, (non-config files may appear)" 20 80 6 "${files[@]}" 3>&1 1>&2 2>&3)
 
       exitStatus=$?
